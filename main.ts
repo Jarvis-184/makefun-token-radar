@@ -1,7 +1,10 @@
 import { parseSnapshot, buildRadar, boardIssue, dataScript } from './lib/model.ts';
 import { buildDossier, PLAIN_NAME } from './vendor/makefun-board.ts';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Main function for the token radar CLI tool.
@@ -61,8 +64,8 @@ function main() {
     };
 
     // Copy resources
-    copyDir('./dashboard', join(output, 'dashboard'));
-    copyDir('./screenshots', join(output, 'screenshots'));
+    copyDir(resolve(__dirname, 'dashboard'), join(output, 'dashboard'));
+    copyDir(resolve(__dirname, 'screenshots'), join(output, 'screenshots'));
 
     // Validate screenshot count
     if (readdirSync(join(output, 'screenshots')).length < 3) {
