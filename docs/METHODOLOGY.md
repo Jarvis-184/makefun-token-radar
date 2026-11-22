@@ -1,0 +1,104 @@
+# Radar-1 Model Methodology
+
+The radar-1 model is a quantitative framework designed to estimate the implied value of pre-token DeFi protocols. It provides a standardized way to rank projects based on their current fundamentals, growth trajectory, and operational maturity. This document details the formulas, inputs, and logical steps used to generate the ranked board.
+
+## The Question
+
+The radar-1 model answers a specific question for the bounty hunter: **"Given a protocol's current TVL, recent growth, and age, what is its implied value if it were to launch a token today based on current market comps?"** It aims to identify undervalued "early" opportunities before they hit the public markets.
+
+## Model Inputs
+
+The model operates on a sealed snapshot of the protocol universe. For each protocol, it utilizes the following ten fields:
+*   **slug**: Unique identifier.
+*   **name**: Protocol name.
+*   **category**: DeFi sector (e.g., Lending, DEX, Liquid Staking).
+*   **chains**: List of blockchains where the protocol is deployed.
+*   **tvl_usd**: Total Value Locked in USD.
+*   **change_7d**: 7-day percentage change in TVL.
+*   **mcap_usd**: Current market cap (null for pre-token protocols).
+*   **listed_at**: Date the protocol was first recorded.
+*   **gecko_id**: CoinGecko identifier (null for pre-token).
+*   **symbol**: Token ticker (null for pre-token).
+
+## Core Factors and Formulas
+
+The final implied value is the product of a base valuation and two multipliers.
+
+### 1. Category Comp Ratios
+The model calculates a `median_ratio` (Market Cap / TVL) for every category using protocols that already have a live token and at least $10M in TVL.
+*   **Source**: If a category has 4 or more live peers, it uses the category-specific median.
+*   **Global Fallback**: If fewer than 4 peers exist, it uses the global median of all live protocols.
+*   **Clamping**: Ratios are clamped between a floor of 0.05 and a cap of 3.0.
+
+### 2. Base Valuation
+The base value represents a "fair" entry price before adjusting for growth or age, applying a standard discount for being pre-launch.
+*   **Formula**: `base = tvl_usd * median_ratio * LAUNCH_DISCOUNT`
+*   **Constant**: `LAUNCH_DISCOUNT = 0.55`
+
+### 3. Growth Multiplier
+Growth reward protocols for recent TVL expansion. The 7-day change is capped to prevent outliers from distorting the board.
+*   **Formula**: `growthMult = 1 + (clamp(change_7d, -60, 120) / 100) * GROWTH_WEIGHT`
+*   **Constant**: `GROWTH_WEIGHT = 0.5`
+
+### 4. Maturity Multiplier
+Older protocols are considered more "mature" and receive a higher multiplier, while new protocols are penalized for lack of track record.
+*   **Formula**: `maturityMult = 0.6 + (min(age_days, 1095) / 1095) * 0.4`
+*   **Default Age**: If `listed_at` is unknown, the model assumes 365 days.
+
+### 5. Implied Value (Final)
+The final result is rounded to the nearest dollar.
+*   **Formula**: `implied = max(1, round(base * growthMult * maturityMult))`
+
+### 6. Airdrop Pool Share
+The estimated value of the token pool reserved for community airdrops.
+*   **Formula**: `airdrop_pool = implied * AIRDROP_SHARE`
+*   **Constant**: `AIRDROP_SHARE = 0.07`
+
+### 7. Confidence Badge
+Each row is assigned a confidence level based on data quality:
+*   **High**: Category has ≥ 8 live peers and protocol age is known.
+*   **Medium**: Category has ≥ 4 live peers.
+*   **Low**: Uses global fallback or has few category peers.
+
+## Worked Example: Steakhouse Financial (Rank #1)
+
+Using real data from the current model run:
+
+| Factor | Input/Value |
+| :--- | :--- |
+| **TVL (USD)** | $2,753,981,495 |
+| **7d Growth** | -2.1935% |
+| **Age (Days)** | 543 |
+| **Category Ratio** | 0.1691 (Global fallback) |
+| **Launch Discount** | 0.55 |
+| **Growth Mult** | $1 + (-2.1935 / 100 * 0.5) = 0.9890$ |
+| **Maturity Mult** | $0.6 + (543 / 1095 * 0.4) = 0.7984$ |
+| **Implied Value** | **$202,243,495** |
+| **Airdrop Pool** | **$14,157,045** |
+
+## Limits and Known Biases
+
+Users should interpret these rankings with the following caveats:
+*   **TVL Quality**: The model treats all TVL equally. Protocols with TVL composed mostly of stablecoins or highly liquid assets are technically "safer" than those with volatile or protocol-native TVL, but the model does not distinguish between them.
+*   **Token Existence**: A protocol marked as "pre-token" simply means it lacks a CoinGecko ID or Market Cap in the snapshot. This is not proof that a token does not exist or hasn't been announced elsewhere.
+*   **Category Thinness**: Categories with very few peers (e.g., Prediction Markets) may rely on the global median, which might not reflect the specific valuation dynamics of that niche.
+*   **Growth Spikes**: While growth is capped at 120%, short-term TVL mercenary capital can still artificially inflate a protocol's rank just before a snapshot.
+
+## Farm Plan Rules
+
+The detail view for each protocol includes an automated "Farm Plan" generated by the following logic:
+*   **Capital Caps**: Recommended capital is tiered by TVL ($50 to $250).
+*   **Safety Steps**: Always recommends a fresh wallet and offline seed phrase storage.
+*   **No Paid Claims**: A hard rule—never pay a fee to claim an airdrop; only use official links.
+*   **Activity**: Requires at least one qualifying action per week for a minimum duration (30 to 60 days depending on age).
+
+## Reproducibility
+
+The board can be reproduced byte-for-byte by running the model against the same input snapshot:
+1.  Install dependencies: `npm install`.
+2.  Run the engine: `MAKEFUN_OUTPUT_DIR=out node main.ts --input snapshot.json`.
+3.  Compare `out/board.json` with the published values.
+
+The model is deterministic; given the same constants in `lib/model.ts` and the same `snapshot.json`, the output will always be identical.
+
+**Note**: Implied values are model estimates derived from protocol data. They are not market prices, not a promise of future value, and should not be used as financial advice.
